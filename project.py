@@ -1,6 +1,23 @@
 from pysat.formula import CNFPlus
 from pysat.solvers import Minicard
 
+
+def func_DEP_t(T, N, DEP_t, dep, formula):
+    """To add clause DEPt in cnf."""
+    for t in range(T):
+        for p in range(N):
+            for s in range(2):
+                formula.append([-DEP_t[t], dep(t, p, s)])
+                formula.append([dep(t, p, s), DEP_t[t]])
+
+
+def func_ARR_t(T, durations, ARR_t, dur, formula):
+    """To add clause ARRt in cnf."""
+    for t in range(T):
+        for d in durations:
+            formula.append([-ARR_t[t], dur[]])
+
+
 def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
     N = len(durations)          # number of chicken 
     idCounter = 1               # increment counter to get new ID
@@ -31,7 +48,7 @@ def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
         idCounter += 1
 
         for p in range(N):
-            
+
             for s in range(2): # 0: Aller, 1: Retour
                 dep[(t, p, s)] = idCounter
                 idCounter += 1
@@ -46,5 +63,17 @@ def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
                 dur[(t, d)] = idCounter
                 idCounter += 1
         
+        # we can start the CNF
+        formula = CNFPlus()
+
+        #DEPt
+        func_DEP_t(T, N, DEP_t, dep, formula)
+
+        #ARRt
+        func_ARR_t(T, durations, ARR_t, dur, formula)
+
+
+
+
 def find_duration(durations: list[int], c: int) -> int:
     pass
