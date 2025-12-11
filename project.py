@@ -100,5 +100,30 @@ def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
     #ALL(t)
     ALL = id_ALL(T, vpool)
 
+    # (¬DEP𝑡 ∨ dep𝑡,𝑝,𝑠) ∧ (dep𝑡,𝑝,𝑠 ∨ DEP𝑡) constraint
+    for t in range(T):
+        for p in range(N):
+            for s in range(2):
+                constraints.append([-DEP[t], dep[(t, p, s)]])
+                constraints.append([dep[(t, p, s)], DEP[t]])
+            
+    # Cohérence entre départs et arrivée
+    for t in range(T):
+        for t2 in range(t):
+            for d in durations:
+                if t2+d == t:
+                    constraints.append([-ARR[t], dur[t2, d]])
+                    constraints.append([-dur[t2, d], ARR[t]])
+
+    # Condition de complétion
+    for t in range(T):
+        for p in range(N):
+            constraints.append([-ALL[t], B[(p, t)]])
+            constraints.append([-B[(p, t)], ALL[t]])
+
+    # Contrainte dur(t, d): deux durées ne peuvent pas avoir lieu au même moment
+    double_dur = []
+    for t in range(T):
+
 def find_duration(durations: list[int], c: int) -> int:
     pass
