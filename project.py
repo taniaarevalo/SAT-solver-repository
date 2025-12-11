@@ -121,9 +121,22 @@ def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
             constraints.append([-ALL[t], B[(p, t)]])
             constraints.append([-B[(p, t)], ALL[t]])
 
-    # Contrainte dur(t, d): deux durées ne peuvent pas avoir lieu au même moment
-    double_dur = []
+    # Contraintes dur(t, d)
     for t in range(T):
+        for i, d1 in enumerate(durations):
+            for d2 in durations[i+1:]:
+                constraints.append([-dur[(t, d1)], -dur[(t, d2)]])
+
+    for t in range(T):
+        for d in durations:
+            for p in range(N):
+                if durations[p] > d:
+                    for s in range(2):
+                        constraints.append([-dur[(t, d)], -dep[(t, p, s)]])
+                elif durations[p] == d:
+                    for s in range(2):
+                        constraints.append([-dep[(t, p, s)], dur[(t, d)]])
+    
 
 def find_duration(durations: list[int], c: int) -> int:
     pass
