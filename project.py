@@ -1,5 +1,6 @@
 from pysat.formula import CNFPlus, IDPool
 from pysat.solvers import Minicard
+from pysat.card import CardEnc
 
 
 def id_dep(T, N, vpool):
@@ -62,6 +63,7 @@ def id_ARR(T, vpool):
         ARR[t] = vpool.id(("ARR", t))
     return ARR
 
+
 def id_ALL(T, vpool):
     """Will return a dictionnary with all the id for ALL. {t: id}"""
     ALL = {}
@@ -70,34 +72,33 @@ def id_ALL(T, vpool):
     return ALL
 
 
-
 def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
     N = len(durations)          # number of chicken 
-    formula = CNFPlus()         # we can start the CNF
+    constraints = CNFPlus()         # we can start the CNF
     vpool = IDPool()            # to associate variable to a SAT number
 
-    #dep(t, p, s)
+    # dep(t, p, s)
     dep = id_dep(T, N, vpool)
 
-    #A(p, t)
+    # A(p, t)
     A = id_A(T, N, vpool)
 
-    #B(p, t)
+    # B(p, t)
     B = id_B(T, N, vpool)
 
-    #dur(t, d)
+    # dur(t, d)
     dur = id_dur(T, durations, vpool)
 
-    #side(t)
+    # side(t)
     side = id_side(T, vpool)
 
-    #DEP(t)
+    # DEP(t)
     DEP = id_DEP(T, vpool)
 
-    #ARR(t)
+    # ARR(t)
     ARR = id_ARR(T, vpool)
 
-    #ALL(t)
+    # ALL(t)
     ALL = id_ALL(T, vpool)
 
     # (¬DEP𝑡 ∨ dep𝑡,𝑝,𝑠) ∧ (dep𝑡,𝑝,𝑠 ∨ DEP𝑡) constraint
@@ -137,6 +138,68 @@ def gen_solution(durations: list[int], c: int, T: int) -> None | list[tuple]:
                     for s in range(2):
                         constraints.append([-dep[(t, p, s)], dur[(t, d)]])
     
+    # capacité max de la barque, atmlst : ∑(𝑝) dep𝑡,𝑝,𝑠 <= 𝐶
+    for t in range(T):
+        for s in range(2):
+            lits = []
+            for p in range(N):
+                lits.append(dep[(t, p, s)])
+            barque = CardEnc.atmost(lits, bound = c,vpool = vpool, encoding = 1)
+            constraints.extend(barque.clauses)
+
+    # contrainte d'alternance et position de la barque side(t)
+    for t in range(T):
+        for p in range(N):
+            constraints.append([-side[t], -dep[(t, p, 1)]])
+            constraints.append([side[t], -dep[(t, p, 0)]])
+
+    # mise à jour de la position de la barque
+    for t in range(T):
+            for d in durations:
+                if t+d < T:
+                    constraints.append([-dur[(t, d)], -side[t], side[t+d]])
+                    constraints.append([-dur[(t, d)], side[t], -side[t+d]])
+
+    # évolution des poules sur la berge A et B
+    for t in range(T):
+        for d in durations:
+            if d + t < T:
+                for p in range(N):
+                    constraints.append([-dep[(t, p, 0)], -dur[(t, d)], B[(p, t+d)]])
+                    constraints.append([-dep[(t, p, 1)], -dur[(t, d)], A[(p, t+d)]])
+    for t in range(T):
+        if t + 1 < T:
+            for p in range(N):
+                constraints.append([dep[(t, p, 0)], dep[(t, p, 1)], -A[(p, t)], A[(p, t+1)]])
+                constraints.append([dep[(t, p, 0)], dep[(t, p, 1)], -B[(p, t)], B[(p, t+1)]])
+
+    # interdiction de départs multiples pendant une traversée
+    for t in range(T):
+        for d in durations:
+            for k in range(1, d):
+                if t+k < T:
+                    constraints.append([-dur[(t, d)], -DEP[(t+k)]])
+    
+    with Minicard(bootstrap_with=constraints) as solver:
+        sat = solver.solve()
+        if not sat:
+            return None
+        model = solver.get_model()
+        true_vars = set(v for v in model if v > 0)
+
+        solution = []
+        for t in range(T):
+            if DEP[t] in true_vars:
+                chickens = []
+                for p in range(N):
+                    for s in range(2):
+                        if dep[(t, p, s)] in true_vars:
+                            chickens.append(p + 1)
+                            break
+                solution.append((t, chickens))
+
+        return solution
+
 
 def find_duration(durations: list[int], c: int) -> int:
     pass
